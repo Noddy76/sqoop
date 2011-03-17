@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import com.cloudera.sqoop.SqoopOptions;
+import com.cloudera.sqoop.manager.ColumnType;
 import com.cloudera.sqoop.manager.ConnManager;
 
 import java.io.File;
@@ -76,13 +77,13 @@ public class TableDefWriter {
     this.commentsEnabled = withComments;
   }
 
-  private Map<String, Integer> externalColTypes;
+  private Map<String, ColumnType> externalColTypes;
 
   /**
    * Set the column type map to be used.
    * (dependency injection for testing; not used in production.)
    */
-  void setColumnTypes(Map<String, Integer> colTypes) {
+  void setColumnTypes(Map<String, ColumnType> colTypes) {
     this.externalColTypes = colTypes;
     LOG.debug("Using test-controlled type map");
   }
@@ -113,7 +114,7 @@ public class TableDefWriter {
    * @return the CREATE TABLE statement for the table to load into hive.
    */
   public String getCreateTableStmt() throws IOException {
-    Map<String, Integer> columnTypes;
+    Map<String, ColumnType> columnTypes;
 
     if (externalColTypes != null) {
       // Use pre-defined column types.
@@ -144,8 +145,8 @@ public class TableDefWriter {
 
       first = false;
 
-      Integer colType = columnTypes.get(col);
-      String hiveColType = connManager.toHiveType(colType);
+      ColumnType colType = columnTypes.get(col);
+      String hiveColType = colType.getHiveType();
       if (null == hiveColType) {
         throw new IOException("Hive does not support the SQL type for column "
             + col);
@@ -153,7 +154,7 @@ public class TableDefWriter {
 
       sb.append('`').append(col).append("` ").append(hiveColType);
 
-      if (HiveTypes.isHiveTypeImprovised(colType)) {
+      if (HiveTypes.isHiveTypeImprovised(colType.getSqlType())) {
         LOG.warn(
             "Column " + col + " had to be cast to a less precise type in Hive");
       }

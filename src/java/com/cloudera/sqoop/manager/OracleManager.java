@@ -24,6 +24,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
@@ -384,8 +385,11 @@ public class OracleManager extends GenericJdbcManager {
    * @param sqlType
    * @return the name of a Java type to hold the sql datatype, or null if none.
    */
-  public String toJavaType(int sqlType) {
-    String defaultJavaType = super.toJavaType(sqlType);
+  @Override
+  protected String toJavaType(ResultSetMetaData metadata, int columnIndex)
+      throws SQLException {
+    int sqlType = metadata.getColumnType(columnIndex);
+    String defaultJavaType = super.toJavaType(metadata, columnIndex);
     return (defaultJavaType == null) ? dbToJavaType(sqlType) : defaultJavaType;
   }
 

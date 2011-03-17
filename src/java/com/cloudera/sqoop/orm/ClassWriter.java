@@ -20,6 +20,7 @@ package com.cloudera.sqoop.orm;
 
 import org.apache.hadoop.io.BytesWritable;
 import com.cloudera.sqoop.SqoopOptions;
+import com.cloudera.sqoop.manager.ColumnType;
 import com.cloudera.sqoop.manager.ConnManager;
 import com.cloudera.sqoop.manager.SqlManager;
 import com.cloudera.sqoop.lib.BigDecimalSerializer;
@@ -230,6 +231,10 @@ public class ClassWriter {
     }
 
     String lastPart = parts[parts.length - 1];
+    lastPart = lastPart.replace("<", "");
+    lastPart = lastPart.replace(">", "");
+    lastPart = lastPart.replace(",", "");
+    lastPart = lastPart.replace(" ", "");
     try {
       String getter = "read" + Character.toUpperCase(lastPart.charAt(0))
           + lastPart.substring(1);
@@ -258,6 +263,10 @@ public class ClassWriter {
     }
 
     String lastPart = parts[parts.length - 1];
+    lastPart = lastPart.replace("<", "");
+    lastPart = lastPart.replace(">", "");
+    lastPart = lastPart.replace(",", "");
+    lastPart = lastPart.replace(" ", "");
     try {
       String setter = "write" + Character.toUpperCase(lastPart.charAt(0))
           + lastPart.substring(1);
@@ -270,18 +279,37 @@ public class ClassWriter {
     }
   }
 
+  /**
+   * @param javaType the type to be stringified
+   * @param colName the column
+   * @return the line of code to create and set the String stringExpr to the
+   *         string representation of this javaType
+   */
   private String stringifierForType(String javaType, String colName) {
     if (javaType.equals("String")) {
       // Check if it is null, and write the null representation in such case
-      String r = colName  + "==null?\"" + this.options.getNullStringValue()
-          + "\":" + colName;
+      String r = "String " + colName + " = this." + colName + "==null?\""
+          + this.options.getNullStringValue() + "\":this." + colName + ";\n";
+      return r;
+    } else if (javaType.matches("List<.*?>")) {
+      String r = "String " + colName + " = \"\";\n"
+               + "boolean __" + colName + "_first = true;\n"
+               + "for(Object o: this." + colName + ") {\n"
+               + "  if (__" + colName + "_first) {"
+               + "    __" + colName + "_first = false;\n"
+               + "  } else {\n"
+               + "    "+ colName + " += \",\";\n"
+               + "  }\n"
+               + "  " + colName + " += \"\" + o; \n"
+               + "}\n";
       return r;
     } else {
       // This is an object type -- just call its toString() in a null-safe way.
       // Also check if it is null, and instead write the null representation
       // in such case
-      String r = colName  + "==null?\"" + this.options.getNullNonStringValue()
-          + "\":" + "\"\" + " + colName;
+      String r = "String " + colName + " = this." + colName + "==null?\""
+          + this.options.getNullNonStringValue() + "\":" + "\"\" + this."
+          + colName + ";\n";
       return r;
     }
   }
@@ -337,6 +365,18 @@ public class ClassWriter {
     } else if (javaType.equals(BytesWritable.class.getName())) {
       return "    this." + colName + " = new BytesWritable();\n"
           + "    this." + colName + ".readFields(" + inputObj + ");\n";
+    } else if (javaType.equals("List<Integer>")) {
+      return "    this." + colName + " = new java.util.ArrayList<Integer>();\n"
+          +  "    int __" + colName + "_size = " + inputObj + ".readInt();\n"
+          +  "    for (int i =0; i < __" + colName + "_size; i++) {\n"
+          +  "      this." + colName + ".add(" + inputObj + ".readInt());\n"
+          +  "    }\n";
+    } else if (javaType.equals("List<Boolean>")) {
+      return "    this." + colName + " = new java.util.ArrayList<Boolean>();\n"
+          +  "    int __" + colName + "_size = " + inputObj + ".readInt();\n"
+          +  "    for (int i =0; i < __" + colName + "_size; i++) {\n"
+          +  "      this." + colName + ".add(" + inputObj + ".readBoolean());\n"
+          +  "    }\n";
     } else {
       LOG.error("No ResultSet method for Java type " + javaType);
       return null;
@@ -361,7 +401,7 @@ public class ClassWriter {
 
   /**
    * @param javaType the type to write
-   * @param inputObj the name of the DataOutput to write to
+   * @param outputObj the name of the DataOutput to write to
    * @param colName the column name to write
    * @return the line of code involving a DataOutput object to write an entry
    * with a given java type.
@@ -401,6 +441,16 @@ public class ClassWriter {
     } else if (javaType.equals(BlobRef.class.getName())) {
       return "    " + LobSerializer.class.getCanonicalName()
           + ".writeBlob(this." + colName + ", " + outputObj + ");\n";
+    } else if (javaType.equals("List<Integer>")) {
+      return "    " + outputObj + ".writeInt(this." + colName + ".size());\n"
+          +  "    for(Integer i: this." + colName + ") {\n"
+          +  "      " + outputObj + ".writeInt(i);\n"
+          +  "    }\n";
+    } else if (javaType.equals("List<Boolean>")) {
+      return "    " + outputObj + ".writeInt(this." + colName + ".size());\n"
+          +  "    for(Boolean i: this." + colName + ") {\n"
+          +  "      " + outputObj + ".writeBoolean(i);\n"
+          +  "    }\n";
     } else {
       LOG.error("No ResultSet method for Java type " + javaType);
       return null;
@@ -431,14 +481,14 @@ public class ClassWriter {
    * @param colNames - ordered list of column names for table.
    * @param sb - StringBuilder to append code to
    */
-  private void generateFields(Map<String, Integer> columnTypes,
+  private void generateFields(Map<String, ColumnType> columnTypes,
       String [] colNames, StringBuilder sb) {
 
     for (String col : colNames) {
-      int sqlType = columnTypes.get(col);
-      String javaType = connManager.toJavaType(sqlType);
+      String javaType = columnTypes.get(col).getJavaType();
       if (null == javaType) {
-        LOG.error("Cannot resolve SQL type " + sqlType);
+        LOG.error("Cannot resolve SQL type "
+            + columnTypes.get(col).getSqlType());
         continue;
       }
 
@@ -455,7 +505,7 @@ public class ClassWriter {
    * @param colNames - ordered list of column names for table.
    * @param sb - StringBuilder to append code to
    */
-  private void generateDbRead(Map<String, Integer> columnTypes,
+  private void generateDbRead(Map<String, ColumnType> columnTypes,
       String [] colNames, StringBuilder sb) {
 
     sb.append("  public void readFields(ResultSet __dbResults) ");
@@ -470,11 +520,10 @@ public class ClassWriter {
     for (String col : colNames) {
       fieldNum++;
 
-      int sqlType = columnTypes.get(col);
-      String javaType = connManager.toJavaType(sqlType);
+      String javaType = columnTypes.get(col).getJavaType();
       if (null == javaType) {
-        LOG.error("No Java type for SQL type " + sqlType
-                  + " for column " + col);
+        LOG.error("No Java type for SQL type "
+            + columnTypes.get(col).getSqlType() + " for column " + col);
         continue;
       }
 
@@ -495,7 +544,7 @@ public class ClassWriter {
    * Generate the loadLargeObjects() method called by the mapper to load
    * delayed objects (that require the Context from the mapper).
    */
-  private void generateLoadLargeObjects(Map<String, Integer> columnTypes,
+  private void generateLoadLargeObjects(Map<String, ColumnType> columnTypes,
       String [] colNames, StringBuilder sb) {
 
     // This method relies on the __cur_result_set field being set by
@@ -510,11 +559,10 @@ public class ClassWriter {
     for (String col : colNames) {
       fieldNum++;
 
-      int sqlType = columnTypes.get(col);
-      String javaType = connManager.toJavaType(sqlType);
+      String javaType = columnTypes.get(col).getJavaType();
       if (null == javaType) {
-        LOG.error("No Java type for SQL type " + sqlType
-                  + " for column " + col);
+        LOG.error("No Java type for SQL type "
+            + columnTypes.get(col).getSqlType() + " for column " + col);
         continue;
       }
 
@@ -538,7 +586,7 @@ public class ClassWriter {
    * @param colNames - ordered list of column names for table.
    * @param sb - StringBuilder to append code to
    */
-  private void generateDbWrite(Map<String, Integer> columnTypes,
+  private void generateDbWrite(Map<String, ColumnType> columnTypes,
       String [] colNames, StringBuilder sb) {
 
     sb.append("  public void write(PreparedStatement __dbStmt) "
@@ -554,8 +602,8 @@ public class ClassWriter {
     for (String col : colNames) {
       fieldNum++;
 
-      int sqlType = columnTypes.get(col);
-      String javaType = connManager.toJavaType(sqlType);
+      int sqlType = columnTypes.get(col).getSqlType();
+      String javaType = columnTypes.get(col).getJavaType();
       if (null == javaType) {
         LOG.error("No Java type for SQL type " + sqlType
                   + " for column " + col);
@@ -583,18 +631,17 @@ public class ClassWriter {
    * @param colNames - ordered list of column names for table.
    * @param sb - StringBuilder to append code to
    */
-  private void generateHadoopRead(Map<String, Integer> columnTypes,
+  private void generateHadoopRead(Map<String, ColumnType> columnTypes,
       String [] colNames, StringBuilder sb) {
 
     sb.append("  public void readFields(DataInput __dataIn) "
         + "throws IOException {\n");
 
     for (String col : colNames) {
-      int sqlType = columnTypes.get(col);
-      String javaType = connManager.toJavaType(sqlType);
+      String javaType = columnTypes.get(col).getJavaType();
       if (null == javaType) {
-        LOG.error("No Java type for SQL type " + sqlType
-                  + " for column " + col);
+        LOG.error("No Java type for SQL type "
+            + columnTypes.get(col).getSqlType() + " for column " + col);
         continue;
       }
 
@@ -616,7 +663,7 @@ public class ClassWriter {
    * @param colNames - ordered list of column names for table.
    * @param sb - StringBuilder to append code to
    */
-  private void generateCloneMethod(Map<String, Integer> columnTypes,
+  private void generateCloneMethod(Map<String, ColumnType> columnTypes,
       String [] colNames, StringBuilder sb) {
 
     TableClassName tableNameInfo = new TableClassName(options);
@@ -627,8 +674,7 @@ public class ClassWriter {
 
     // For each field that is mutable, we need to perform the deep copy.
     for (String colName : colNames) {
-      int sqlType = columnTypes.get(colName);
-      String javaType = connManager.toJavaType(sqlType);
+      String javaType = columnTypes.get(colName).getJavaType();
       if (null == javaType) {
         continue;
       } else if (javaType.equals("java.sql.Date")
@@ -655,7 +701,7 @@ public class ClassWriter {
    * @param colNames - ordered list of column names for table.
    * @param sb - StringBuilder to append code to
    */
-  private void generateGetFieldMap(Map<String, Integer> columnTypes,
+  private void generateGetFieldMap(Map<String, ColumnType> columnTypes,
       String [] colNames, StringBuilder sb) {
     sb.append("  public Map<String, Object> getFieldMap() {\n");
     sb.append("    Map<String, Object> __sqoop$field_map = "
@@ -674,7 +720,7 @@ public class ClassWriter {
    * @param colNames - ordered list of column names for table.
    * @param sb - StringBuilder to append code to
    */
-  private void generateToString(Map<String, Integer> columnTypes,
+  private void generateToString(Map<String, ColumnType> columnTypes,
       String [] colNames, StringBuilder sb) {
 
     // Save the delimiters to the class.
@@ -694,11 +740,10 @@ public class ClassWriter {
 
     boolean first = true;
     for (String col : colNames) {
-      int sqlType = columnTypes.get(col);
-      String javaType = connManager.toJavaType(sqlType);
+      String javaType = columnTypes.get(col).getJavaType();
       if (null == javaType) {
-        LOG.error("No Java type for SQL type " + sqlType
-                  + " for column " + col);
+        LOG.error("No Java type for SQL type "
+            + columnTypes.get(col).getSqlType() + " for column " + col);
         continue;
       }
 
@@ -709,13 +754,9 @@ public class ClassWriter {
 
       first = false;
 
-      String stringExpr = stringifierForType(javaType, col);
-      if (null == stringExpr) {
-        LOG.error("No toString method for Java type " + javaType);
-        continue;
-      }
+      sb.append(stringifierForType(javaType, col));
 
-      sb.append("    __sb.append(FieldFormatter.escapeAndEnclose(" + stringExpr
+      sb.append("    __sb.append(FieldFormatter.escapeAndEnclose(" + col
           + ", delimiters));\n");
     }
 
@@ -766,11 +807,10 @@ public class ClassWriter {
    * field of a specified name and type from the next element of the field
    * strings list.
    */
-  private void parseColumn(String colName, int colType, StringBuilder sb) {
+  private void parseColumn(String colName, String javaType, StringBuilder sb) {
     // assume that we have __it and __cur_str vars, based on
     // __loadFromFields() code.
     sb.append("    __cur_str = __it.next();\n");
-    String javaType = connManager.toJavaType(colType);
 
     parseNullVal(javaType, colName, sb);
     if (javaType.equals("String")) {
@@ -804,6 +844,11 @@ public class ClassWriter {
       sb.append("      this." + colName + " = ClobRef.parse(__cur_str);\n");
     } else if (javaType.equals(BlobRef.class.getName())) {
       sb.append("      this." + colName + " = BlobRef.parse(__cur_str);\n");
+    } else if (javaType.equals("List<Integer>")) {
+      sb.append("      this." + colName + " = new ArrayList<Integer>();\n");
+      sb.append("      for (String s: __cur_str.split(\",\")) {\n");
+      sb.append("        this." + colName + ".add(Integer.parseInt(s));\n");
+      sb.append("      }\n");
     } else {
       LOG.error("No parser available for Java type " + javaType);
     }
@@ -817,7 +862,7 @@ public class ClassWriter {
    * @param colNames - ordered list of column names for table.
    * @param sb - StringBuilder to append code to
    */
-  private void generateParser(Map<String, Integer> columnTypes,
+  private void generateParser(Map<String, ColumnType> columnTypes,
       String [] colNames, StringBuilder sb) {
 
     // Embed into the class the delimiter characters to use when parsing input
@@ -845,8 +890,8 @@ public class ClassWriter {
     sb.append("    Iterator<String> __it = fields.listIterator();\n");
     sb.append("    String __cur_str;\n");
     for (String colName : colNames) {
-      int colType = columnTypes.get(colName);
-      parseColumn(colName, colType, sb);
+      ColumnType colType = columnTypes.get(colName);
+      parseColumn(colName, colType.getJavaType(), sb);
     }
     sb.append("  }\n\n");
   }
@@ -857,18 +902,17 @@ public class ClassWriter {
    * @param colNames - ordered list of column names for table.
    * @param sb - StringBuilder to append code to
    */
-  private void generateHadoopWrite(Map<String, Integer> columnTypes,
+  private void generateHadoopWrite(Map<String, ColumnType> columnTypes,
       String [] colNames, StringBuilder sb) {
 
     sb.append("  public void write(DataOutput __dataOut) "
         + "throws IOException {\n");
 
     for (String col : colNames) {
-      int sqlType = columnTypes.get(col);
-      String javaType = connManager.toJavaType(sqlType);
+      String javaType = columnTypes.get(col).getJavaType();
       if (null == javaType) {
-        LOG.error("No Java type for SQL type " + sqlType
-                  + " for column " + col);
+        LOG.error("No Java type for SQL type "
+            + columnTypes.get(col).getSqlType() + " for column " + col);
         continue;
       }
 
@@ -907,7 +951,7 @@ public class ClassWriter {
    * Generate the ORM code for the class.
    */
   public void generate() throws IOException {
-    Map<String, Integer> columnTypes;
+    Map<String, ColumnType> columnTypes;
 
     if (null != tableName) {
       // We're generating a class based on a table import.
@@ -938,7 +982,7 @@ public class ClassWriter {
       // the same case as the keys in the columnTypes map. So make sure
       // we add the appropriate aliases in that map.
       for (String userColName : colNames) {
-        for (Map.Entry<String, Integer> typeEntry : columnTypes.entrySet()) {
+        for (Map.Entry<String, ColumnType> typeEntry : columnTypes.entrySet()) {
           String typeColName = typeEntry.getKey();
           if (typeColName.equalsIgnoreCase(userColName)
               && !typeColName.equals(userColName)) {
@@ -1012,7 +1056,7 @@ public class ClassWriter {
       LOG.debug("Table name: " + tableName);
       StringBuilder sbColTypes = new StringBuilder();
       for (String col : colNames) {
-        Integer colType = columnTypes.get(col);
+        Integer colType = columnTypes.get(col).getSqlType();
         sbColTypes.append(col + ":" + colType + ", ");
       }
       String colTypeStr = sbColTypes.toString();
@@ -1066,7 +1110,7 @@ public class ClassWriter {
    * @return - A StringBuilder that contains the text of the class code.
    */
   private StringBuilder generateClassForColumns(
-      Map<String, Integer> columnTypes,
+      Map<String, ColumnType> columnTypes,
       String [] colNames, String [] dbWriteColNames) {
     StringBuilder sb = new StringBuilder();
     sb.append("// ORM class for " + tableName + "\n");
@@ -1106,6 +1150,7 @@ public class ClassWriter {
     sb.append("import java.sql.Date;\n");
     sb.append("import java.sql.Time;\n");
     sb.append("import java.sql.Timestamp;\n");
+    sb.append("import java.util.ArrayList;\n");
     sb.append("import java.util.Arrays;\n");
     sb.append("import java.util.Iterator;\n");
     sb.append("import java.util.List;\n");
