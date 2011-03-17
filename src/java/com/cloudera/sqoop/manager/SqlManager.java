@@ -74,6 +74,8 @@ public abstract class SqlManager extends ConnManager {
   protected SqoopOptions options;
   private Statement lastStatement;
 
+  private Map<String, ColumnType> columnTypes;
+
   /**
    * Constructs the SqlManager.
    * @param opts the SqoopOptions describing the user's requested action.
@@ -197,7 +199,8 @@ public abstract class SqlManager extends ConnManager {
 
     try {
       Map<String, Integer> colTypes = new HashMap<String, Integer>();
-
+      columnTypes = new HashMap<String, ColumnType>();
+      
       int cols = results.getMetaData().getColumnCount();
       ResultSetMetaData metadata = results.getMetaData();
       for (int i = 1; i < cols + 1; i++) {
@@ -208,6 +211,7 @@ public abstract class SqlManager extends ConnManager {
         }
 
         colTypes.put(colName, Integer.valueOf(typeId));
+        columnTypes.put(colName, calculateColumnType(metadata, i));
       }
 
       return colTypes;
@@ -469,6 +473,11 @@ public abstract class SqlManager extends ConnManager {
    */
   protected ResultSet execute(String stmt, Object... args) throws SQLException {
     return execute(stmt, options.getFetchSize(), args);
+  }
+
+  @Override
+  public ColumnType getColumnType(String columnName) {
+    return columnTypes.get(columnName);
   }
 
   /**

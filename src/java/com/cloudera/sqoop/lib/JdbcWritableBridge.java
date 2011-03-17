@@ -20,12 +20,15 @@ package com.cloudera.sqoop.lib;
 
 import org.apache.hadoop.io.BytesWritable;
 import java.math.BigDecimal;
+import java.sql.Array;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Contains a set of methods which can read db columns from a ResultSet into
@@ -133,6 +136,34 @@ public final class JdbcWritableBridge {
       throws SQLException {
     // Loading of CLOBs is delayed; handled by LargeObjectLoader.
     return null;
+  }
+
+  public static List<Integer> readListInteger(int colNum, ResultSet r)
+      throws SQLException {
+    Array sqlArray = r.getArray(colNum);
+    if (sqlArray == null) {
+      return null;
+    }
+    ResultSet array = sqlArray.getResultSet();
+    List<Integer> result = new ArrayList<Integer>();
+    while (array.next()) {
+      result.add(readInteger(2, array));
+    }
+    return result;
+  }
+
+  public static List<Boolean> readListBoolean(int colNum, ResultSet r)
+      throws SQLException {
+    Array sqlArray = r.getArray(colNum);
+    if (sqlArray == null) {
+      return null;
+    }
+    ResultSet array = sqlArray.getResultSet();
+    List<Boolean> result = new ArrayList<Boolean>();
+    while (array.next()) {
+      result.add(readBoolean(2, array));
+    }
+    return result;
   }
 
   public static void writeInteger(Integer val, int paramIdx, int sqlType,
@@ -250,5 +281,17 @@ public final class JdbcWritableBridge {
       int sqlType, PreparedStatement s) throws SQLException {
     // TODO: support this.
     throw new RuntimeException("Unsupported: Cannot export CLOB data");
+  }
+
+  public static void writeListInteger(List<Integer> val, int paramIdx,
+      int sqlType, PreparedStatement s) throws SQLException {
+    // TODO; support this.
+    throw new RuntimeException("Unsupported: Cannot export ARRAY data");
+  }
+
+  public static void writeListBoolean(List<Boolean> val, int paramIdx,
+      int sqlType, PreparedStatement s) throws SQLException {
+    // TODO; support this.
+    throw new RuntimeException("Unsupported: Cannot export ARRAY data");
   }
 }

@@ -159,7 +159,7 @@ public class DirectPostgresqlManager extends PostgresqlManager {
       if (!first) {
         sb.append(", ");
       }
-      sb.append(col);
+      sb.append(escapeColName(col));
       first = false;
     }
 
@@ -198,7 +198,7 @@ public class DirectPostgresqlManager extends PostgresqlManager {
       }
 
       sb.append(" FROM ");
-      sb.append(tableName);
+      sb.append(escapeTableName(tableName));
       sb.append(" WHERE ");
       sb.append(whereClause);
       sb.append(")");

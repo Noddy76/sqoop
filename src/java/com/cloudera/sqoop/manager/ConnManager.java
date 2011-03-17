@@ -21,6 +21,7 @@ package com.cloudera.sqoop.manager;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Map;
@@ -69,10 +70,38 @@ public abstract class ConnManager {
   public abstract String getPrimaryKey(String tableName);
 
   /**
+   * Calculate the ColumnType of the indicated column from the
+   * ResultSetMetaData. If this method is not supported then return null and
+   * the deprecated toJavaType and toHiveType methods will be used instead.
+   * @param metadata
+   * @param columnIndex
+   * @return The ColumnType for the indicated column
+   * @throws SQLException
+   */
+  protected ColumnType calculateColumnType(ResultSetMetaData metadata,
+      int columnIndex) throws SQLException {
+    int sqlType = metadata.getColumnType(columnIndex);
+    String javaType = toJavaType(sqlType);
+    String hiveType = toHiveType(sqlType);
+    return new ColumnType(sqlType, javaType, hiveType);
+  }
+
+  /**
+   * Get a ColumnType object describing the type of the named column for various
+   * systems (Java, Hive, etc)
+   * @param columnName
+   * @return The ColumnType object for this column
+   */
+  public ColumnType getColumnType(String columnName) {
+    return null;
+  }
+
+  /**
    * Return java type for SQL type.
    * @param sqlType     sql type
    * @return            java type
    */
+  @Deprecated
   public abstract String toJavaType(int sqlType);
 
     /**
@@ -80,6 +109,7 @@ public abstract class ConnManager {
      * @param sqlType   sql type
      * @return          hive type
      */
+  @Deprecated
   public abstract String toHiveType(int sqlType);
 
   /**
