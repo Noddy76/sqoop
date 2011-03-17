@@ -91,13 +91,13 @@ public class TestSqlManager extends TestCase {
 
   @Test
   public void testListColTypes() {
-    Map<String, Integer> types = manager.getColumnTypes(
+    Map<String, ColumnType> types = manager.getColumnTypes(
         HsqldbTestServer.getTableName());
 
     assertNotNull("manager returned no types map", types);
     assertEquals("Map should be size=2", 2, types.size());
-    assertEquals(types.get("INTFIELD1").intValue(), Types.INTEGER);
-    assertEquals(types.get("INTFIELD2").intValue(), Types.INTEGER);
+    assertEquals(types.get("INTFIELD1").getSqlType(), Types.INTEGER);
+    assertEquals(types.get("INTFIELD2").getSqlType(), Types.INTEGER);
   }
 
   @Test
@@ -109,7 +109,7 @@ public class TestSqlManager extends TestCase {
 
   @Test
   public void testMissingTableColTypes() {
-    Map<String, Integer> colTypes = manager.getColumnTypes(MISSING_TABLE);
+    Map<String, ColumnType> colTypes = manager.getColumnTypes(MISSING_TABLE);
     assertNull("No column types should be returned for missing table",
         colTypes);
   }

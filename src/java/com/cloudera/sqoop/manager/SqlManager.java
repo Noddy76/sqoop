@@ -170,13 +170,13 @@ public abstract class SqlManager extends ConnManager {
   }
 
   @Override
-  public Map<String, Integer> getColumnTypes(String tableName) {
+  public Map<String, ColumnType> getColumnTypes(String tableName) {
     String stmt = getColTypesQuery(tableName);
     return getColumnTypesForRawQuery(stmt);
   }
 
   @Override
-  public Map<String, Integer> getColumnTypesForQuery(String query) {
+  public Map<String, ColumnType> getColumnTypesForQuery(String query) {
     // Manipulate the query to return immediately, with zero rows.
     String rawQuery = query.replace(SUBSTITUTE_TOKEN, " (1 = 0) ");
     return getColumnTypesForRawQuery(rawQuery);
@@ -185,7 +185,7 @@ public abstract class SqlManager extends ConnManager {
   /**
    * Get column types for a query statement that we do not modify further.
    */
-  protected Map<String, Integer> getColumnTypesForRawQuery(String stmt) {
+  protected Map<String, ColumnType> getColumnTypesForRawQuery(String stmt) {
     ResultSet results;
     try {
       results = execute(stmt);
@@ -196,7 +196,7 @@ public abstract class SqlManager extends ConnManager {
     }
 
     try {
-      Map<String, Integer> colTypes = new HashMap<String, Integer>();
+      Map<String, ColumnType> colTypes = new HashMap<String, ColumnType>();
 
       int cols = results.getMetaData().getColumnCount();
       ResultSetMetaData metadata = results.getMetaData();
@@ -207,7 +207,8 @@ public abstract class SqlManager extends ConnManager {
           colName = metadata.getColumnLabel(i);
         }
 
-        colTypes.put(colName, Integer.valueOf(typeId));
+        colTypes.put(colName, new ColumnType(typeId, toJavaType(metadata, i),
+            toHiveType(typeId)));
       }
 
       return colTypes;
@@ -475,8 +476,12 @@ public abstract class SqlManager extends ConnManager {
    * Resolve a database-specific type to the Java type that should contain it.
    * @param sqlType
    * @return the name of a Java type to hold the sql datatype, or null if none.
+   * @throws SQLException 
    */
-  public String toJavaType(int sqlType) {
+  @Override
+  protected String toJavaType(ResultSetMetaData metadata, int columnIndex)
+      throws SQLException {
+    int sqlType = metadata.getColumnType(columnIndex);
     // Mappings taken from:
     // http://java.sun.com/j2se/1.3/docs/guide/jdbc/getstart/mapping.html
     if (sqlType == Types.INTEGER) {
@@ -534,7 +539,8 @@ public abstract class SqlManager extends ConnManager {
    * @param sqlType     sql type
    * @return            hive type
    */
-  public String toHiveType(int sqlType) {
+  @Override
+  protected String toHiveType(int sqlType) {
     return HiveTypes.toHiveType(sqlType);
   }
 

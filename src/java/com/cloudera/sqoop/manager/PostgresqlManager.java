@@ -19,6 +19,7 @@
 package com.cloudera.sqoop.manager;
 
 import java.io.IOException;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 
 import org.apache.commons.logging.Log;
@@ -51,6 +52,39 @@ public class PostgresqlManager extends GenericJdbcManager {
   }
 
   @Override
+  public String escapeColName(String colName) {
+    return escapeIdentifier(colName);
+  }
+
+  @Override
+  public String escapeTableName(String tableName) {
+    return escapeIdentifier(tableName);
+  }
+
+  protected String escapeIdentifier(String identifier) {
+    if (identifier == null) {
+      return null;
+    }
+    return "\"" + identifier.replace("\"", "\"\"") + "\"";
+  }
+
+  @Override
+  protected String toJavaType(ResultSetMetaData metadata, int columnIndex)
+      throws SQLException {
+    String result = super.toJavaType(metadata, columnIndex);
+    if (result == null) {
+      String columnType = metadata.getColumnTypeName(columnIndex);
+
+      if ("_int4".equals(columnType)) {
+        result = "List<Integer>";
+      } else if ("_bool".equals(columnType)) {
+        result = "List<Boolean>";
+      }
+    }
+    return result;
+  }
+  
+  @Override
   public void close() throws SQLException {
     if (this.hasOpenConnection()) {
       this.getConnection().commit(); // Commit any changes made thus far.
@@ -81,13 +115,6 @@ public class PostgresqlManager extends GenericJdbcManager {
 
     // Then run the normal importTable() method.
     super.importTable(context);
-  }
-
-  @Override
-  public String getPrimaryKey(String tableName) {
-    // Postgresql stores table names using lower-case internally; need
-    // to always convert to lowercase before querying the metadata dictionary.
-    return super.getPrimaryKey(tableName.toLowerCase());
   }
 
   @Override
