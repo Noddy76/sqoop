@@ -19,6 +19,8 @@
 package com.cloudera.sqoop;
 
 import org.apache.hadoop.conf.Configuration;
+
+import com.cloudera.sqoop.manager.ColumnType;
 import com.cloudera.sqoop.manager.ConnManager;
 import com.cloudera.sqoop.manager.ImportJobContext;
 import com.cloudera.sqoop.manager.ManagerFactory;
@@ -31,6 +33,8 @@ import java.io.IOException;
 import java.util.Map;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 
 /**
  * Test the ConnFactory implementation and its ability to delegate to multiple
@@ -131,7 +135,8 @@ public class TestConnFactory extends TestCase {
     * @param sqlType     sql data type
     * @return            java data type
     */
-    public String toJavaType(int sqlType) {
+    protected String toJavaType(ResultSetMetaData metadata, int columnIndex)
+        throws SQLException {
       return null;
     }
 
@@ -140,11 +145,11 @@ public class TestConnFactory extends TestCase {
     * @param sqlType     sql data type
     * @return            hive data type
     */
-    public String toHiveType(int sqlType) {
+    protected String toHiveType(int sqlType) {
       return null;
     }
 
-    public Map<String, Integer> getColumnTypes(String tableName) {
+    public Map<String, ColumnType> getColumnTypes(String tableName) {
       return null;
     }
 

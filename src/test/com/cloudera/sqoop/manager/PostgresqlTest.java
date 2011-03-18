@@ -135,14 +135,19 @@ public class PostgresqlTest extends ImportJobTestCase {
           + manager.escapeColName("name") + " VARCHAR(24) NOT NULL, "
           + manager.escapeColName("start_date") + " DATE, "
           + manager.escapeColName("salary") + " FLOAT, "
-          + manager.escapeColName("dept") + " VARCHAR(32))");
+          + manager.escapeColName("dept") + " VARCHAR(32),"
+          + manager.escapeColName("perms") + " BOOLEAN[],"
+          + manager.escapeColName("numbers") + " INT[])");
 
       st.executeUpdate("INSERT INTO " + manager.escapeTableName(TABLE_NAME)
-          + " VALUES(1,'Aaron','2009-05-14',1000000.00,'engineering')");
+          + " VALUES(1,'Aaron','2009-05-14',1000000.00,'engineering',"
+          + "'{f,f}','{1,2,3}')");
       st.executeUpdate("INSERT INTO " + manager.escapeTableName(TABLE_NAME)
-          + " VALUES(2,'Bob','2009-04-20',400.00,'sales')");
+          + " VALUES(2,'Bob','2009-04-20',400.00,'sales',"
+          + "'{t,f}','{4,5,6}')");
       st.executeUpdate("INSERT INTO " + manager.escapeTableName(TABLE_NAME)
-          + " VALUES(3,'Fred','2009-01-23',15.00,'marketing')");
+          + " VALUES(3,'Fred','2009-01-23',15.00,'marketing',"
+          + "'{t,t}','{7,8,9}')");
       connection.commit();
     } catch (SQLException sqlE) {
       LOG.error("Encountered SQL Exception: " + sqlE);
@@ -181,6 +186,8 @@ public class PostgresqlTest extends ImportJobTestCase {
     args.add(DATABASE_USER);
     args.add("--where");
     args.add("id > 1");
+    args.add("--optionally-enclosed-by");
+    args.add("\"");
 
     if (isDirect) {
       args.add("--direct");
@@ -238,8 +245,8 @@ public class PostgresqlTest extends ImportJobTestCase {
   @Test
   public void testJdbcBasedImport() throws IOException {
     String [] expectedResults = {
-      "2,Bob,2009-04-20,400.0,sales",
-      "3,Fred,2009-01-23,15.0,marketing",
+      "2,Bob,2009-04-20,400.0,sales,\"true,false\",\"4,5,6\"",
+      "3,Fred,2009-01-23,15.0,marketing,\"true,true\",\"7,8,9\"",
     };
 
     doImportAndVerify(false, expectedResults);
@@ -248,8 +255,8 @@ public class PostgresqlTest extends ImportJobTestCase {
   @Test
   public void testDirectImport() throws IOException {
     String [] expectedResults = {
-      "2,Bob,2009-04-20,400,sales",
-      "3,Fred,2009-01-23,15,marketing",
+      "2,Bob,2009-04-20,400,sales,\"{t,f}\",\"{4,5,6}\"",
+      "3,Fred,2009-01-23,15,marketing,\"{t,t}\",\"{7,8,9}\"",
     };
 
     doImportAndVerify(true, expectedResults);

@@ -25,6 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import com.cloudera.sqoop.SqoopOptions;
+import com.cloudera.sqoop.manager.ColumnType;
 
 import junit.framework.TestCase;
 
@@ -63,7 +64,7 @@ public class TestTableDefWriter extends TestCase {
     TableDefWriter writer = new TableDefWriter(options, null,
         "inputTable", "outputTable", conf, false);
 
-    Map<String, Integer> colTypes = new HashMap<String, Integer>();
+    Map<String, ColumnType> colTypes = new HashMap<String, ColumnType>();
     writer.setColumnTypes(colTypes);
 
     String createTable = writer.getCreateTableStmt();

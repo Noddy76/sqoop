@@ -21,6 +21,7 @@ package com.cloudera.sqoop.manager;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Map;
@@ -72,15 +73,17 @@ public abstract class ConnManager {
    * Return java type for SQL type.
    * @param sqlType     sql type
    * @return            java type
+   * @throws SQLException 
    */
-  public abstract String toJavaType(int sqlType);
+  protected abstract String toJavaType(ResultSetMetaData metadata,
+      int columnIndex) throws SQLException;
 
     /**
      * Return hive type for SQL type.
      * @param sqlType   sql type
      * @return          hive type
      */
-  public abstract String toHiveType(int sqlType);
+  protected abstract String toHiveType(int sqlType);
 
   /**
    * Return an unordered mapping from colname to sqltype for
@@ -88,7 +91,7 @@ public abstract class ConnManager {
    *
    * The Integer type id is a constant from java.sql.Types
    */
-  public abstract Map<String, Integer> getColumnTypes(String tableName);
+  public abstract Map<String, ColumnType> getColumnTypes(String tableName);
 
   /**
    * This method allows various connection managers to indicate if they support
@@ -150,7 +153,7 @@ public abstract class ConnManager {
    *
    * The Integer type id is a constant from java.sql.Types
    */
-  public Map<String, Integer> getColumnTypesForQuery(String query) {
+  public Map<String, ColumnType> getColumnTypesForQuery(String query) {
     LOG.error("This database does not support free-form query column types.");
     return null;
   }
