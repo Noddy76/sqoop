@@ -185,7 +185,7 @@ public class PostgresqlTest extends ImportJobTestCase {
     args.add("--username");
     args.add(DATABASE_USER);
     args.add("--where");
-    args.add("id > 1");
+    args.add("\"id\" > 1");
     args.add("--optionally-enclosed-by");
     args.add("\"");
 

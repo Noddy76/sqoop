@@ -84,8 +84,6 @@
       conf="common->default"/>
     <dependency org="commons-io" name="commons-io" rev="${commons-io.version}"
       conf="common->default;redist->default"/>
-    <dependency org="postgresql" name="postgresql" rev="${postgresql.version}"
-      conf="common->default"/>
     
     <!-- dependencies for static analysis -->
     <dependency org="checkstyle" name="checkstyle" rev="${checkstyle.version}"

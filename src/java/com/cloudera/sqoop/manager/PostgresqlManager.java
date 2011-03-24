@@ -19,14 +19,11 @@
 package com.cloudera.sqoop.manager;
 
 import java.io.IOException;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.postgresql.PGResultSetMetaData;
 
 import com.cloudera.sqoop.SqoopOptions;
 import com.cloudera.sqoop.util.ImportException;
@@ -74,38 +71,14 @@ public class PostgresqlManager extends GenericJdbcManager {
   @Override
   protected String toJavaType(ResultSetMetaData metadata, int columnIndex)
       throws SQLException {
-    PGResultSetMetaData pgMetadata = (PGResultSetMetaData) metadata;
-    
     String result = super.toJavaType(metadata, columnIndex);
     if (result == null) {
-      PreparedStatement stmt = getConnection().prepareStatement(
-          "SELECT c.data_type as type, e.data_type as collection_type"
-          + "  FROM information_schema.columns c"
-          + "    LEFT JOIN information_schema.element_types e"
-          + "  ON ((c.table_name, c.table_schema, 'TABLE', c.dtd_identifier)"
-          + "    = (e.object_name, e.object_schema, e.object_type,"
-          + "       e.collection_type_identifier))"
-          + "  WHERE c.table_schema = ?"
-          + "    AND c.table_name = ?"
-          + "    AND c.column_name = ?"
-      );
-      stmt.setString(1, pgMetadata.getBaseSchemaName(columnIndex));
-      stmt.setString(2, pgMetadata.getBaseTableName(columnIndex));
-      stmt.setString(3, pgMetadata.getBaseColumnName(columnIndex));
-      ResultSet schemaResults = stmt.executeQuery();
-      if(!schemaResults.next()) {
-        LOG.error("No schema data obtained for column " + columnIndex);
-        return null;
-      }
-      String columnType = schemaResults.getString("type");
-      String columnCollectionType = schemaResults.getString("collection_type");
+      String columnType = metadata.getColumnTypeName(columnIndex);
 
-      if ("ARRAY".equals(columnType)) {
-        if ("integer".equals(columnCollectionType)) {
-          result = "List<Integer>";
-        } else if ("boolean".equals(columnCollectionType)) {
-          result = "List<Boolean>";
-        }
+      if ("_int4".equals(columnType)) {
+        result = "List<Integer>";
+      } else if ("_bool".equals(columnType)) {
+        result = "List<Boolean>";
       }
     }
     return result;
@@ -142,13 +115,6 @@ public class PostgresqlManager extends GenericJdbcManager {
 
     // Then run the normal importTable() method.
     super.importTable(context);
-  }
-
-  @Override
-  public String getPrimaryKey(String tableName) {
-    // Postgresql stores table names using lower-case internally; need
-    // to always convert to lowercase before querying the metadata dictionary.
-    return super.getPrimaryKey(tableName.toLowerCase());
   }
 
   @Override
