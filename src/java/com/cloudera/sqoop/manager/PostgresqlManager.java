@@ -71,6 +71,7 @@ public class PostgresqlManager extends GenericJdbcManager {
     return "\"" + identifier.replace("\"", "\"\"") + "\"";
   }
 
+  @Override
   protected String toJavaType(ResultSetMetaData metadata, int columnIndex)
       throws SQLException {
     PGResultSetMetaData pgMetadata = (PGResultSetMetaData) metadata;
