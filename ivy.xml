@@ -84,6 +84,14 @@
       conf="common->default"/>
     <dependency org="commons-io" name="commons-io" rev="${commons-io.version}"
       conf="common->default;redist->default"/>
+    <dependency org="org.apache.hadoop.hive" name="hive-exec" rev="0.7.0-CDH3B4"
+      conf="common->default">
+      <exclude org="org.apache.thrift" module="libfb303"/>
+      <exclude org="org.apache.thrift" module="libthrift"/>
+      <exclude org="javax.jdo" module="jdo2-api"/>
+    </dependency>
+    <dependency org="org.apache.pig" name="pig" rev="0.8.0-CDH3B4"
+      conf="common->default"/>
     
     <!-- dependencies for static analysis -->
     <dependency org="checkstyle" name="checkstyle" rev="${checkstyle.version}"
